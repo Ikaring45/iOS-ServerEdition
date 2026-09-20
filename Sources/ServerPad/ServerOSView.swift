@@ -1,5 +1,6 @@
 import SwiftUI
 
+@MainActor
 public struct ServerOSView: View {
     @StateObject private var platform: ServerPlatform
 
@@ -23,7 +24,7 @@ public struct ServerOSView: View {
                         }.frame(maxWidth: .infinity, alignment: .leading)
                     }
                     GroupBox("HTTP設定") {
-                        HStack { Text("ポート"); Spacer(); TextField("8080", value: $platform.port, format: .number).keyboardType(.numberPad).multilineTextAlignment(.trailing).frame(width: 100).disabled(platform.isRunning) }
+                        HStack { Text("ポート"); Spacer(); TextField("8080", value: $platform.port, format: .number).multilineTextAlignment(.trailing).frame(width: 100).disabled(platform.isRunning) }
                     }
                     Button(platform.isRunning ? "サーバーを停止" : "サーバーを起動") {
                         Task { platform.isRunning ? await platform.stop() : await platform.start() }
@@ -53,4 +54,3 @@ private struct LogsView: View {
         }.navigationTitle("アクセスログ")
     }
 }
-
