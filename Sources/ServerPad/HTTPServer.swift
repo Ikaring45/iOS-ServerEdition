@@ -6,9 +6,12 @@ public actor HTTPServer {
     private var listener: NWListener?
     private let queue = DispatchQueue(label: "ServerPad.HTTP")
     private let handler: Handler
-    private let maximumRequestBytes = 25 * 1024 * 1024
+    private let maximumRequestBytes: Int
 
-    public init(handler: @escaping Handler) { self.handler = handler }
+    public init(maximumRequestBytes: Int = 25 * 1024 * 1024, handler: @escaping Handler) {
+        self.maximumRequestBytes = max(1, maximumRequestBytes)
+        self.handler = handler
+    }
 
     public func start(port: UInt16) async throws {
         guard listener == nil else { return }
@@ -65,4 +68,3 @@ public actor HTTPServer {
         connection.send(content: response.encoded(headOnly: headOnly), completion: .contentProcessed { _ in connection.cancel() })
     }
 }
-
