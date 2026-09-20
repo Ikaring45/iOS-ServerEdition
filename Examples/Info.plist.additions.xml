@@ -1,0 +1,4 @@
+<!-- App target's Info.plist dictionary に追加 -->
+<key>NSLocalNetworkUsageDescription</key>
+<string>同じWi-Fi内の端末へWeb・API・ファイル共有を提供するため</string>
+
