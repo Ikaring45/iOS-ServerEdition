@@ -71,3 +71,14 @@ curl --data-binary @photo.jpg "http://IPAD-IP:8080/files/upload?name=photo.jpg"
 
 Bonjour広告、PIN認証、multipartアップロード、ZIP操作、ストレージ使用量、サービス別スイッチ、バックグラウンド移行時の明示停止を追加できます。
 
+## CIとRelease
+
+GitHub ActionsでmacOS上の `swift test` を自動実行します。Releaseを作るときは、GitHub上でタグを作成するか、ローカルGitで次を実行します。
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+`v*.*.*` のタグがpushされると、テスト成功後にソースZIP付きのGitHub Releaseを自動作成します。
+
