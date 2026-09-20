@@ -3,21 +3,19 @@ import SwiftUI
 @MainActor
 struct ServerSettingsView: View {
     @ObservedObject var platform: ServerPlatform
-    @State private var allowLAN = true
-    @State private var autoStart = false
-
     var body: some View {
         Form {
             Section("稼働状態") {
                 LabeledContent("状態", value: platform.status)
-                Toggle("同じWi‑Fiからの接続を許可", isOn: $allowLAN)
-                Toggle("アプリ起動時に自動起動", isOn: $autoStart)
+                Toggle("アプリ起動時に自動起動", isOn: $platform.autoStart)
                 Button(platform.isRunning ? "サーバーを停止" : "サーバーを起動") {
                     Task { platform.isRunning ? await platform.stop() : await platform.start() }
                 }
             }
             Section("HTTP") {
+                HStack { Text("サーバー名"); Spacer(); TextField("ServerPad", text: $platform.serverName).multilineTextAlignment(.trailing).frame(width: 180) }
                 HStack { Text("待受ポート"); Spacer(); TextField("8080", value: $platform.port, format: .number).multilineTextAlignment(.trailing).frame(width: 100).disabled(platform.isRunning) }
+                HStack { Text("最大リクエスト"); Spacer(); TextField("25", value: $platform.maxRequestMiB, format: .number).multilineTextAlignment(.trailing).frame(width: 80); Text("MiB") }
                 Text("ポートを変更する場合は、サーバーを停止してから変更してください。").font(.caption).foregroundStyle(.secondary)
             }
         }.navigationTitle("サーバー設定")
@@ -70,19 +68,22 @@ struct SystemView: View {
     }
 }
 
+@MainActor
 struct PluginsView: View {
+    @ObservedObject var platform: ServerPlatform
     var body: some View {
         List {
             Section("プラグイン") {
-                Label("現在は組み込み機能のみ", systemImage: "puzzlepiece.extension")
-                Text("プラグインAPIを先に固定し、任意コードを直接実行しない方式で追加します。")
-                    .font(.caption).foregroundStyle(.secondary)
+                ForEach(platform.plugins) { plugin in
+                    Toggle(isOn: Binding(get: { plugin.isEnabled }, set: { platform.setPluginEnabled(plugin.id, enabled: $0) })) {
+                        VStack(alignment: .leading) {
+                            Text(plugin.name)
+                            Text(plugin.summary).font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                }
             }
-            Section("予定") {
-                Label("Bonjour公開", systemImage: "bonjour")
-                Label("PIN認証", systemImage: "key")
-                Label("ZIP操作", systemImage: "archivebox")
-            }
+            Section { Text("プラグインは現在、設定状態の保存まで対応しています。実際の機能を有効化する段階で、各プラグインの権限とAPIを追加します。").font(.caption).foregroundStyle(.secondary) }
         }.navigationTitle("プラグイン")
     }
 }
@@ -107,15 +108,7 @@ struct BuildCodeView: View {
 struct ConfigCodeView: View {
     @ObservedObject var platform: ServerPlatform
     var body: some View {
-        let code = """
-        {
-          \"server\": {
-            \"port\": \(platform.port),
-            \"running\": \(platform.isRunning),
-            \"sharedDirectory\": \"Documents/ServerPad Shared\"
-          }
-        }
-        """
+        let code = platform.configurationJSON
         return CodeTextView(title: "構成コード", code: code)
     }
 }
