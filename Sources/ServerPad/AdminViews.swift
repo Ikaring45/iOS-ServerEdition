@@ -88,7 +88,7 @@ struct PluginsView: View {
 }
 
 struct BuildCodeView: View {
-    private let code = """\
+    private let code = """
     // システム構築の入口
     import SwiftUI
     import ServerPad
@@ -107,7 +107,7 @@ struct BuildCodeView: View {
 struct ConfigCodeView: View {
     @ObservedObject var platform: ServerPlatform
     var body: some View {
-        let code = """\
+        let code = """
         {
           \"server\": {
             \"port\": \(platform.port),
@@ -125,7 +125,7 @@ struct CommandLineView: View {
     @ObservedObject var platform: ServerPlatform
     var body: some View {
         let host = platform.localAddresses.first ?? "IPAD-IP"
-        let commands = """\
+        let commands = """
         # 状態確認
         curl http://\(host):\(platform.port)/api/status
 
