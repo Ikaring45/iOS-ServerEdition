@@ -82,3 +82,5 @@ git push origin v0.1.0
 
 `v*.*.*` のタグがpushされると、テスト成功後にソースZIP付きのGitHub Releaseを自動作成します。
 
+
+CIはSwift 6対応修正後のmainコミットで実行されます。
