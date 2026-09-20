@@ -17,30 +17,77 @@ public struct SharedFile: Identifiable, Codable, Sendable {
     public let modified: Date
 }
 
+public struct ServerPlugin: Identifiable, Codable, Sendable {
+    public let id: String
+    public let name: String
+    public let summary: String
+    public var isEnabled: Bool
+
+    public init(id: String, name: String, summary: String, isEnabled: Bool = false) {
+        self.id = id
+        self.name = name
+        self.summary = summary
+        self.isEnabled = isEnabled
+    }
+}
+
 @MainActor
 public final class ServerPlatform: ObservableObject {
     @Published public private(set) var isRunning = false
     @Published public private(set) var status = "停止中"
     @Published public private(set) var logs: [ServerLog] = []
     @Published public private(set) var files: [SharedFile] = []
-    @Published public var port: UInt16 = 8080
+    @Published public var port: UInt16 = 8080 { didSet { saveSettings() } }
+    @Published public var serverName = "ServerPad" { didSet { saveSettings() } }
+    @Published public var maxRequestMiB: Int = 25 { didSet { saveSettings() } }
+    @Published public var autoStart = false { didSet { saveSettings() } }
     @Published public private(set) var localAddresses: [String] = []
+    @Published public private(set) var plugins: [ServerPlugin] = []
 
     private var server: HTTPServer?
     private let filesURL: URL
+    private let settings = UserDefaults.standard
+    private let settingsKey = "ServerPad.settings.v1"
 
     public init(filesURL: URL? = nil) {
         self.filesURL = filesURL ?? FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("ServerPad Shared", isDirectory: true)
         try? FileManager.default.createDirectory(at: self.filesURL, withIntermediateDirectories: true)
+        if let data = settings.data(forKey: settingsKey),
+           let saved = try? JSONDecoder().decode(SettingsSnapshot.self, from: data) {
+            self.port = saved.port
+            self.serverName = saved.serverName
+            self.maxRequestMiB = saved.maxRequestMiB
+            self.autoStart = saved.autoStart
+            self.plugins = Self.defaultPlugins.map { plugin in
+                var plugin = plugin
+                plugin.isEnabled = saved.enabledPluginIDs.contains(plugin.id)
+                return plugin
+            }
+        } else {
+            self.plugins = Self.defaultPlugins
+        }
         refreshFiles()
     }
 
     public var accessURLs: [String] { localAddresses.map { "http://\($0):\(port)" } }
 
+    public var configurationJSON: String {
+        let snapshot = SettingsSnapshot(port: port, serverName: serverName, maxRequestMiB: maxRequestMiB, autoStart: autoStart, enabledPluginIDs: plugins.filter(\.isEnabled).map(\.id))
+        guard let data = try? JSONEncoder().encode(snapshot), let text = String(data: data, encoding: .utf8) else { return "{}" }
+        return text
+    }
+
+    public func setPluginEnabled(_ id: String, enabled: Bool) {
+        guard let index = plugins.firstIndex(where: { $0.id == id }) else { return }
+        plugins[index].isEnabled = enabled
+        saveSettings()
+        record("プラグイン\(enabled ? "有効化" : "無効化"): \(plugins[index].name)")
+    }
+
     public func start() async {
         guard !isRunning else { return }
         status = "起動中…"
-        let runtime = HTTPServer { [weak self] request in
+        let runtime = HTTPServer(maximumRequestBytes: maxRequestMiB * 1024 * 1024) { [weak self] request in
             guard let self else { return .text("Unavailable", status: 503) }
             return await self.route(request)
         }
@@ -120,6 +167,26 @@ public final class ServerPlatform: ObservableObject {
         logs.insert(ServerLog(date: Date(), message: message), at: 0)
         if logs.count > 200 { logs.removeLast(logs.count - 200) }
     }
+
+    private func saveSettings() {
+        let snapshot = SettingsSnapshot(port: port, serverName: serverName, maxRequestMiB: maxRequestMiB, autoStart: autoStart, enabledPluginIDs: plugins.filter(\.isEnabled).map(\.id))
+        guard let data = try? JSONEncoder().encode(snapshot) else { return }
+        settings.set(data, forKey: settingsKey)
+    }
+
+    private struct SettingsSnapshot: Codable {
+        let port: UInt16
+        let serverName: String
+        let maxRequestMiB: Int
+        let autoStart: Bool
+        let enabledPluginIDs: [String]
+    }
+
+    private static let defaultPlugins = [
+        ServerPlugin(id: "bonjour", name: "Bonjour公開", summary: "同じネットワーク上でサービスを見つけやすくする", isEnabled: false),
+        ServerPlugin(id: "pin-auth", name: "PIN認証", summary: "管理画面への簡易認証を追加する", isEnabled: false),
+        ServerPlugin(id: "zip", name: "ZIP操作", summary: "共有ファイルをZIPでまとめる", isEnabled: false)
+    ]
 
     private static func addresses() -> [String] {
         var result: [String] = []
