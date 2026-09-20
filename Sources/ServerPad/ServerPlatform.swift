@@ -103,7 +103,7 @@ public final class ServerPlatform: ObservableObject {
         guard !name.isEmpty,
               name != ".", name != "..",
               !value.contains("/"), !value.contains("\\"),
-              name.unicodeScalars.allSatisfy({ !$0.properties.isControl })
+              name.unicodeScalars.allSatisfy({ !CharacterSet.controlCharacters.contains($0) })
         else { return nil }
         return name
     }
@@ -148,4 +148,3 @@ public final class ServerPlatform: ObservableObject {
     <div class="card"><h1>ServerPad</h1><p>iPad HTTP server is running.</p><p><a href="/files">共有ファイル</a> · <a href="/api/status">API status</a> · <a href="/api/files">API files</a></p><p><code>POST /files/upload?name=example.txt</code></p></div>
     """
 }
-
