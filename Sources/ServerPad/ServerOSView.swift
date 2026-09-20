@@ -11,6 +11,18 @@ public struct ServerOSView: View {
         NavigationSplitView {
             List {
                 Label("ダッシュボード", systemImage: "server.rack")
+                Section("管理") {
+                    NavigationLink { ServerSettingsView(platform: platform) } label: { Label("サーバー設定", systemImage: "gearshape.2") }
+                    NavigationLink { NetworkView(platform: platform) } label: { Label("ポート／アドレス", systemImage: "network") }
+                    NavigationLink { StorageView(platform: platform) } label: { Label("ストレージ", systemImage: "internaldrive") }
+                    NavigationLink { SystemView() } label: { Label("システム", systemImage: "desktopcomputer") }
+                }
+                Section("開発") {
+                    NavigationLink { PluginsView() } label: { Label("プラグイン", systemImage: "puzzlepiece.extension") }
+                    NavigationLink { BuildCodeView() } label: { Label("システム構築コード", systemImage: "hammer") }
+                    NavigationLink { ConfigCodeView(platform: platform) } label: { Label("構成コード", systemImage: "curlybraces.square") }
+                    NavigationLink { CommandLineView(platform: platform) } label: { Label("コマンドライン", systemImage: "terminal") }
+                }
                 NavigationLink { FilesView(platform: platform) } label: { Label("共有ファイル", systemImage: "folder") }
                 NavigationLink { LogsView(platform: platform) } label: { Label("アクセスログ", systemImage: "text.alignleft") }
             }.navigationTitle("ServerPad")
