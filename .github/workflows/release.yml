@@ -1,0 +1,29 @@
+name: ServerPad Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '16.2'
+      - name: Test package
+        run: swift test
+      - name: Create source archive
+        run: zip -r "ServerPad-${GITHUB_REF_NAME}.zip" Package.swift Sources Tests Examples README.md
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" "ServerPad-${GITHUB_REF_NAME}.zip" --generate-notes --title "ServerPad $GITHUB_REF_NAME"
+
