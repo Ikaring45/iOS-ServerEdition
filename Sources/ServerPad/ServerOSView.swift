@@ -18,7 +18,7 @@ public struct ServerOSView: View {
                     NavigationLink { SystemView() } label: { Label("システム", systemImage: "desktopcomputer") }
                 }
                 Section("開発") {
-                    NavigationLink { PluginsView() } label: { Label("プラグイン", systemImage: "puzzlepiece.extension") }
+                    NavigationLink { PluginsView(platform: platform) } label: { Label("プラグイン", systemImage: "puzzlepiece.extension") }
                     NavigationLink { BuildCodeView() } label: { Label("システム構築コード", systemImage: "hammer") }
                     NavigationLink { ConfigCodeView(platform: platform) } label: { Label("構成コード", systemImage: "curlybraces.square") }
                     NavigationLink { CommandLineView(platform: platform) } label: { Label("コマンドライン", systemImage: "terminal") }
@@ -46,6 +46,9 @@ public struct ServerOSView: View {
                         .font(.footnote).foregroundStyle(.secondary)
                 }.padding().frame(maxWidth: 760)
             }.navigationTitle("ダッシュボード")
+                .task {
+                    if platform.autoStart { await platform.start() }
+                }
         }
     }
 }
