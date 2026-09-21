@@ -2,3 +2,7 @@
 <key>NSLocalNetworkUsageDescription</key>
 <string>同じWi-Fi内の端末へWeb・API・ファイル共有を提供するため</string>
 
+<key>NSBonjourServices</key>
+<array>
+    <string>_http._tcp</string>
+</array>
