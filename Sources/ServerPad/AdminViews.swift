@@ -165,6 +165,58 @@ struct BuildCodeView: View {
 }
 
 @MainActor
+struct SSHView: View {
+    @ObservedObject var platform: ServerPlatform
+    @State private var showingPassword = false
+
+    var body: some View {
+        Form {
+            Section("SSH管理サーバー") {
+                Toggle("SSHを有効化", isOn: Binding(
+                    get: { platform.sshEnabled },
+                    set: { platform.setPluginEnabled("ssh", enabled: $0) }
+                ))
+                LabeledContent("状態", value: platform.sshStatus)
+                HStack {
+                    Text("待受ポート")
+                    Spacer()
+                    TextField("2222", value: $platform.sshPort, format: .number)
+                        .multilineTextAlignment(.trailing)
+                        .frame(width: 90)
+                }
+                HStack {
+                    Text("ユーザー名")
+                    Spacer()
+                    TextField("serverpad", text: $platform.sshUsername)
+                        .multilineTextAlignment(.trailing)
+                        .frame(width: 150)
+                }
+                Button(platform.sshStatus == "稼働中" ? "SSHを停止" : "SSHを起動") {
+                    Task {
+                        _ = await platform.executeCommand(platform.sshStatus == "稼働中" ? "ssh stop" : "ssh start")
+                    }
+                }
+            }
+            Section("接続") {
+                LabeledContent("コマンド", value: platform.sshCommand)
+                    .font(.system(.body, design: .monospaced))
+                HStack {
+                    Text("パスワード")
+                    Spacer()
+                    Text(showingPassword ? platform.sshPassword : "••••••••••••••••")
+                        .font(.system(.body, design: .monospaced))
+                    Button(showingPassword ? "隠す" : "表示") { showingPassword.toggle() }
+                }
+                Button("パスワードを再生成") { platform.regenerateSSHPassword(); showingPassword = true }
+                Text("同じWi‑Fi内からのみ接続してください。SSHではServerPad管理コマンドだけを実行できます。")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .navigationTitle("SSH")
+    }
+}
+
+@MainActor
 struct ConfigCodeView: View {
     @ObservedObject var platform: ServerPlatform
     @State private var code = ""
