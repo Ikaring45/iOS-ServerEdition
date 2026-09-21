@@ -30,6 +30,13 @@ struct WebServerView: View {
                 WebEndpointRow(title: "ファイル一覧", path: "/files", platform: platform)
                 WebEndpointRow(title: "ファイル一覧JSON", path: "/api/files", platform: platform)
             }
+            Section("管理API") {
+                Text("POST /api/server/start")
+                Text("POST /api/server/stop")
+                Text("POST /api/server/restart")
+                Text("POST /api/command  {\"command\":\"status\"}")
+                    .font(.system(.caption, design: .monospaced))
+            }
             Section("インターネット公開") {
                 Text("現在は同じWi‑Fi内への公開です。インターネット全体へ公開するには、別途HTTPS対応の中継・トンネルまたはルーター設定が必要です。")
                     .font(.caption).foregroundStyle(.secondary)
