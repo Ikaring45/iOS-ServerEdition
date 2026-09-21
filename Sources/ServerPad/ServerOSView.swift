@@ -12,6 +12,7 @@ public struct ServerOSView: View {
             List {
                 Label("ダッシュボード", systemImage: "server.rack")
                 Section("管理") {
+                    NavigationLink { WebServerView(platform: platform) } label: { Label("Webサーバー公開", systemImage: "globe") }
                     NavigationLink { ServerSettingsView(platform: platform) } label: { Label("サーバー設定", systemImage: "gearshape.2") }
                     NavigationLink { NetworkView(platform: platform) } label: { Label("ポート／アドレス", systemImage: "network") }
                     NavigationLink { StorageView(platform: platform) } label: { Label("ストレージ", systemImage: "internaldrive") }
