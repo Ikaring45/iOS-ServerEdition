@@ -48,6 +48,7 @@ public final class ServerPlatform: ObservableObject {
     @Published public var sshUsername = "serverpad" { didSet { saveSettings() } }
     @Published public private(set) var sshPassword = ""
 
+    private let jmaAPI = JMAAPIService()
     private var server: HTTPServer?
     private var sshServer: SSHServer?
     private let filesURL: URL
@@ -188,6 +189,12 @@ public final class ServerPlatform: ObservableObject {
             case "password": return "ssh-user=\(sshUsername) password=\(sshPassword)"
             default: return "使い方: ssh [status|start|stop|port 2222|password]"
             }
+        case "jma":
+            if parts.count == 1 { return "JMA API: \(selfAccessURL)/api/jma/jma_eew.json" }
+            if parts[1].lowercased() == "endpoints" {
+                return jmaAPI.endpointList.map { selfAccessURL + "/api/jma/" + $0 }.joined(separator: "\n")
+            }
+            return "使い方: jma endpoints"
         case "site":
             if parts.count == 1 { refreshSiteFiles(); return "site-url=\(siteAccessURL) manage=\(siteManageURL) files=\(siteFiles.count)" }
             switch parts[1].lowercased() {
@@ -275,6 +282,9 @@ public final class ServerPlatform: ObservableObject {
             return serveSiteFile(path: rawPath, headOnly: request.method == "HEAD")
         }
 
+        if request.path.hasPrefix("/api/jma/") && request.method == "GET" {
+            return await jmaAPI.response(for: request.path)
+        }
         if request.path == "/api/status" && request.method == "GET" {
             return .json(APIStatus(name: serverName, status: status, running: isRunning, port: port, files: files.count, bonjour: bonjourEnabled, urls: [selfAccessURL] + accessURLs))
         }
@@ -476,6 +486,8 @@ public final class ServerPlatform: ObservableObject {
     plugin ID on|off     プラグイン切替
     config               現在の構成JSON
     curl                 アップロード用curl例
+    jma                  JMA互換APIの入口
+    jma endpoints        JMA API一覧
     site                 Webサイト状態・URL
     site files           Webサイトファイル一覧
     site delete PATH     Webサイトファイル削除
