@@ -9,7 +9,7 @@ actor JMAAPIService {
 
     private var cache: [String: CachedResponse] = [:]
     private let baseURL = URL(string: "https://api.wolfx.jp")!
-    private let allowedEndpoints: Set<String> = [
+    static let endpointNames = [
         "jma_eew.json",
         "jma_earthquake.json",
         "jma_tsunami.json",
@@ -18,6 +18,7 @@ actor JMAAPIService {
         "jma_volcano.json",
         "jma_amedas.json"
     ]
+    private let allowedEndpoints: Set<String> = Set(Self.endpointNames)
 
     func response(for requestPath: String) async -> HTTPResponse {
         let raw = String(requestPath.dropFirst("/api/jma/".count))
@@ -60,14 +61,6 @@ actor JMAAPIService {
     }
 
     nonisolated var endpointList: [String] {
-        [
-            "jma_eew.json",
-            "jma_earthquake.json",
-            "jma_tsunami.json",
-            "jma_warning.json",
-            "jma_forecast.json",
-            "jma_volcano.json",
-            "jma_amedas.json"
-        ]
+        Self.endpointNames
     }
 }
