@@ -37,6 +37,7 @@ public final class ServerPlatform: ObservableObject {
     @Published public private(set) var status = "停止中"
     @Published public private(set) var logs: [ServerLog] = []
     @Published public private(set) var files: [SharedFile] = []
+    @Published public private(set) var siteFiles: [SharedFile] = []
     @Published public var port: UInt16 = 8080 { didSet { saveSettings() } }
     @Published public var serverName = "ServerPad" { didSet { saveSettings() } }
     @Published public var maxRequestMiB: Int = 25 { didSet { saveSettings() } }
@@ -50,12 +51,15 @@ public final class ServerPlatform: ObservableObject {
     private var server: HTTPServer?
     private var sshServer: SSHServer?
     private let filesURL: URL
+    private let siteURL: URL
     private let settings = UserDefaults.standard
     private let settingsKey = "ServerPad.settings.v1"
 
     public init(filesURL: URL? = nil) {
         self.filesURL = filesURL ?? FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("ServerPad Shared", isDirectory: true)
+        self.siteURL = self.filesURL.deletingLastPathComponent().appendingPathComponent("ServerPad Website", isDirectory: true)
         try? FileManager.default.createDirectory(at: self.filesURL, withIntermediateDirectories: true)
+        try? FileManager.default.createDirectory(at: self.siteURL, withIntermediateDirectories: true)
         if let data = settings.data(forKey: settingsKey),
            let saved = try? JSONDecoder().decode(SettingsSnapshot.self, from: data) {
             self.port = saved.port
@@ -75,10 +79,12 @@ public final class ServerPlatform: ObservableObject {
         }
         if self.sshPassword.isEmpty { self.sshPassword = Self.generatePassword() }
         refreshFiles()
+        refreshSiteFiles()
     }
 
     public var accessURLs: [String] { localAddresses.map { "http://\($0):\(port)" } }
     public var selfAccessURL: String { "http://127.0.0.1:\(port)" }
+    public var siteAccessURL: String { selfAccessURL + "/site/" }
     public var bonjourEnabled: Bool { plugins.first(where: { $0.id == "bonjour" })?.isEnabled == true }
     public var sshEnabled: Bool { plugins.first(where: { $0.id == "ssh" })?.isEnabled == true }
     public var sshStatus: String { sshServer?.status ?? "停止中" }
@@ -181,6 +187,16 @@ public final class ServerPlatform: ObservableObject {
             case "password": return "ssh-user=\(sshUsername) password=\(sshPassword)"
             default: return "使い方: ssh [status|start|stop|port 2222|password]"
             }
+        case "site":
+            if parts.count == 1 { refreshSiteFiles(); return "site-url=\(siteAccessURL) files=\(siteFiles.count)" }
+            switch parts[1].lowercased() {
+            case "url": return siteAccessURL
+            case "files", "ls": refreshSiteFiles(); return siteFiles.isEmpty ? "Webサイトのファイルはありません" : siteFiles.map { "\($0.name)\\t\($0.bytes) bytes" }.joined(separator: "\\n")
+            case "delete", "rm":
+                guard parts.count > 2 else { return "使い方: site delete path/to/file" }
+                return deleteSiteFile(named: parts.dropFirst(2).joined(separator: " ")) ? "削除しました" : "削除できません"
+            default: return "使い方: site [url|files|delete path]"
+            }
         case "curl":
             return "curl --data-binary @FILE \"\(selfAccessURL)/files/upload?name=FILE\""
         default:
@@ -239,6 +255,22 @@ public final class ServerPlatform: ObservableObject {
     private func route(_ request: HTTPRequest) async -> HTTPResponse {
         record("\(request.method) \(request.target)")
         if request.path == "/" && ["GET", "HEAD"].contains(request.method) { return .text(Self.homeHTML, contentType: "text/html; charset=utf-8") }
+        if request.path == "/site" || request.path == "/site/" {
+            guard ["GET", "HEAD"].contains(request.method) else { return .text("Method not allowed", status: 405) }
+            return serveSiteFile(path: "index.html", headOnly: request.method == "HEAD")
+        }
+        if request.path == "/api/site/files" && request.method == "GET" {
+            refreshSiteFiles()
+            return .json(siteFiles)
+        }
+        if request.path == "/site/upload" && request.method == "POST" {
+            return uploadSiteFile(request)
+        }
+        if request.path.hasPrefix("/site/") && ["GET", "HEAD"].contains(request.method) {
+            let rawPath = String(request.path.dropFirst("/site/".count)).removingPercentEncoding ?? ""
+            return serveSiteFile(path: rawPath, headOnly: request.method == "HEAD")
+        }
+
         if request.path == "/api/status" && request.method == "GET" {
             return .json(APIStatus(name: serverName, status: status, running: isRunning, port: port, files: files.count, bonjour: bonjourEnabled, urls: [selfAccessURL] + accessURLs))
         }
@@ -271,6 +303,81 @@ public final class ServerPlatform: ObservableObject {
 
     private struct APICommand: Codable { let command: String }
     private struct APICommandResult: Codable { let output: String }
+
+    private func refreshSiteFiles() {
+        let keys: Set<URLResourceKey> = [.fileSizeKey, .contentModificationDateKey, .isRegularFileKey]
+        let root = siteURL.standardizedFileURL
+        let enumerator = FileManager.default.enumerator(at: root, includingPropertiesForKeys: Array(keys), options: [.skipsHiddenFiles])
+        siteFiles = (enumerator?.compactMap { item -> SharedFile? in
+            guard let url = item as? URL,
+                  let values = try? url.resourceValues(forKeys: keys),
+                  values.isRegularFile == true else { return nil }
+            let name = url.path.replacingOccurrences(of: root.path + "/", with: "")
+            return SharedFile(name: name, bytes: values.fileSize ?? 0, modified: values.contentModificationDate ?? .distantPast)
+        } ?? []).sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
+
+    @discardableResult
+    public func deleteSiteFile(named name: String) -> Bool {
+        guard let relative = safeSitePath(name) else { return false }
+        do {
+            try FileManager.default.removeItem(at: siteURL.appendingPathComponent(relative))
+            refreshSiteFiles()
+            record("Webサイトファイルを削除: \(relative)")
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    private func uploadSiteFile(_ request: HTTPRequest) -> HTTPResponse {
+        guard let rawName = request.query["name"],
+              let name = safeSitePath(rawName),
+              !request.body.isEmpty else {
+            return .text("Use POST /site/upload?name=index.html", status: 400)
+        }
+        let destination = siteURL.appendingPathComponent(name)
+        do {
+            try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try request.body.write(to: destination, options: .atomic)
+            refreshSiteFiles()
+            return .json(["saved": name, "bytes": String(request.body.count)])
+        } catch {
+            return .text("Write failed", status: 500)
+        }
+    }
+
+    private func serveSiteFile(path: String, headOnly: Bool) -> HTTPResponse {
+        guard let relative = safeSitePath(path) else { return .text("Invalid path", status: 400) }
+        let root = siteURL.standardizedFileURL
+        var target = root.appendingPathComponent(relative).standardizedFileURL
+        guard target.path.hasPrefix(root.path + "/") else { return .text("Invalid path", status: 400) }
+        if (try? target.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
+            target.appendPathComponent("index.html")
+        }
+        guard let data = try? Data(contentsOf: target) else { return .text("Not found", status: 404) }
+        let ext = target.pathExtension.lowercased()
+        let types = [
+            "html": "text/html; charset=utf-8", "htm": "text/html; charset=utf-8",
+            "css": "text/css; charset=utf-8", "js": "text/javascript; charset=utf-8",
+            "json": "application/json; charset=utf-8", "svg": "image/svg+xml",
+            "png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg",
+            "gif": "image/gif", "webp": "image/webp", "ico": "image/x-icon",
+            "txt": "text/plain; charset=utf-8", "pdf": "application/pdf"
+        ]
+        return HTTPResponse(headers: ["Content-Type": types[ext] ?? "application/octet-stream"], body: headOnly ? Data() : data)
+    }
+
+    private func safeSitePath(_ value: String) -> String? {
+        let normalized = value.replacingOccurrences(of: "\\", with: "/")
+        let components = normalized.split(separator: "/", omittingEmptySubsequences: true).map(String.init)
+        guard !components.isEmpty,
+              !components.contains("."),
+              !components.contains(".."),
+              components.allSatisfy({ !$0.isEmpty && $0.unicodeScalars.allSatisfy { !CharacterSet.controlCharacters.contains($0) } })
+        else { return nil }
+        return components.joined(separator: "/")
+    }
 
     private func upload(_ request: HTTPRequest) -> HTTPResponse {
         guard let rawName = request.query["name"], let name = safeName(rawName), !request.body.isEmpty else { return .text("Use POST /files/upload?name=filename", status: 400) }
@@ -365,6 +472,9 @@ public final class ServerPlatform: ObservableObject {
     plugin ID on|off     プラグイン切替
     config               現在の構成JSON
     curl                 アップロード用curl例
+    site                 Webサイト状態・URL
+    site files           Webサイトファイル一覧
+    site delete PATH     Webサイトファイル削除
     ssh                  SSH状態・接続情報
     ssh start|stop       SSH起動・停止
     ssh password         SSH認証情報
