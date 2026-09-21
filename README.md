@@ -39,6 +39,7 @@ struct ServerPadApp: App {
 ```
 
 5. App設定でローカルネットワーク利用理由を追加します。Xcodeでは `Info.plist` の `NSLocalNetworkUsageDescription` に「同じWi‑Fi内の端末へWeb・API・ファイル共有を提供するため」などを設定します。
+   Bonjour公開を使う場合は、`NSBonjourServices` に `_http._tcp` も追加します。見本は `Examples/Info.plist.additions.xml` にあります。
 6. 実行して「サーバーを起動」を押し、表示されたURLを同じWi‑Fi内のPCやスマートフォンで開きます。
 
 `Examples/ServerPadApp.swift` と `Examples/Info.plist.additions.xml` は、この薄いホストをそのまま確認するための見本です。ホスト側へ本体コードをコピーする運用には戻しません。
@@ -81,6 +82,3 @@ git push origin v0.1.0
 ```
 
 `v*.*.*` のタグがpushされると、テスト成功後にソースZIP付きのGitHub Releaseを自動作成します。
-
-
-CIはSwift 6対応修正後のmainコミットで実行されます。
