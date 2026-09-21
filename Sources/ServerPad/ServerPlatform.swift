@@ -43,8 +43,12 @@ public final class ServerPlatform: ObservableObject {
     @Published public var autoStart = false { didSet { saveSettings() } }
     @Published public private(set) var localAddresses: [String] = []
     @Published public private(set) var plugins: [ServerPlugin] = []
+    @Published public var sshPort: UInt16 = 2222 { didSet { saveSettings() } }
+    @Published public var sshUsername = "serverpad" { didSet { saveSettings() } }
+    @Published public private(set) var sshPassword = ""
 
     private var server: HTTPServer?
+    private var sshServer: SSHServer?
     private let filesURL: URL
     private let settings = UserDefaults.standard
     private let settingsKey = "ServerPad.settings.v1"
@@ -58,6 +62,9 @@ public final class ServerPlatform: ObservableObject {
             self.serverName = saved.serverName
             self.maxRequestMiB = saved.maxRequestMiB
             self.autoStart = saved.autoStart
+            self.sshPort = saved.sshPort
+            self.sshUsername = saved.sshUsername
+            self.sshPassword = saved.sshPassword
             self.plugins = Self.defaultPlugins.map { plugin in
                 var plugin = plugin
                 plugin.isEnabled = saved.enabledPluginIDs.contains(plugin.id)
@@ -66,15 +73,21 @@ public final class ServerPlatform: ObservableObject {
         } else {
             self.plugins = Self.defaultPlugins
         }
+        if self.sshPassword.isEmpty { self.sshPassword = Self.generatePassword() }
         refreshFiles()
     }
 
     public var accessURLs: [String] { localAddresses.map { "http://\($0):\(port)" } }
     public var selfAccessURL: String { "http://127.0.0.1:\(port)" }
     public var bonjourEnabled: Bool { plugins.first(where: { $0.id == "bonjour" })?.isEnabled == true }
+    public var sshEnabled: Bool { plugins.first(where: { $0.id == "ssh" })?.isEnabled == true }
+    public var sshStatus: String { sshServer?.status ?? "停止中" }
+    public var sshCommand: String { "ssh \(sshUsername)@IPAD-IP -p \(sshPort)" }
+
+    public func regenerateSSHPassword() { sshPassword = Self.generatePassword(); saveSettings(); record("SSHパスワードを再生成") }
 
     public var configurationJSON: String {
-        let snapshot = SettingsSnapshot(port: port, serverName: serverName, maxRequestMiB: maxRequestMiB, autoStart: autoStart, enabledPluginIDs: plugins.filter(\.isEnabled).map(\.id))
+        let snapshot = SettingsSnapshot(port: port, serverName: serverName, maxRequestMiB: maxRequestMiB, autoStart: autoStart, sshPort: sshPort, sshUsername: sshUsername, sshPassword: sshPassword, enabledPluginIDs: plugins.filter(\.isEnabled).map(\.id))
         guard let data = try? JSONEncoder().encode(snapshot), let text = String(data: data, encoding: .utf8) else { return "{}" }
         return text
     }
@@ -156,6 +169,18 @@ public final class ServerPlatform: ObservableObject {
             return "plugin \(id)=\(parts[2].lowercased())（反映には再起動が必要）"
         case "config":
             return configurationJSON
+        case "ssh":
+            if parts.count == 1 { return "ssh status=\(sshStatus) enabled=\(sshEnabled) port=\(sshPort) user=\(sshUsername)\\n接続: \(sshCommand)" }
+            switch parts[1].lowercased() {
+            case "start": await startSSH(); return sshStatus
+            case "stop": await stopSSH(); return sshStatus
+            case "port":
+                guard parts.count > 2, let value = UInt16(parts[2]), value > 0 else { return "使い方: ssh port 2222" }
+                guard !sshServer?.isRunning ?? true else { return "SSHを停止してから変更してください" }
+                sshPort = value; return "ssh-port=\(sshPort)"
+            case "password": return "ssh-user=\(sshUsername) password=\(sshPassword)"
+            default: return "使い方: ssh [status|start|stop|port 2222|password]"
+            }
         case "curl":
             return "curl --data-binary @FILE \"\(selfAccessURL)/files/upload?name=FILE\""
         default:
@@ -174,6 +199,7 @@ public final class ServerPlatform: ObservableObject {
             try await runtime.start(port: port)
             server = runtime; isRunning = true; status = "稼働中"
             localAddresses = Self.addresses()
+            if sshEnabled { await startSSH() }
             record("HTTPサーバーをポート \(port) で開始")
         } catch {
             status = "起動失敗: \(error.localizedDescription)"
@@ -182,6 +208,7 @@ public final class ServerPlatform: ObservableObject {
     }
 
     public func stop() async {
+        await stopSSH()
         await server?.stop(); server = nil; isRunning = false; status = "停止中"
         record("HTTPサーバーを停止")
     }
@@ -311,13 +338,17 @@ public final class ServerPlatform: ObservableObject {
         let serverName: String
         let maxRequestMiB: Int
         let autoStart: Bool
+        let sshPort: UInt16
+        let sshUsername: String
+        let sshPassword: String
         let enabledPluginIDs: [String]
     }
 
     private static let defaultPlugins = [
         ServerPlugin(id: "bonjour", name: "Bonjour公開", summary: "同じネットワーク上でサービスを見つけやすくする", isEnabled: false),
         ServerPlugin(id: "pin-auth", name: "PIN認証", summary: "管理画面への簡易認証を追加する", isEnabled: false),
-        ServerPlugin(id: "zip", name: "ZIP操作", summary: "共有ファイルをZIPでまとめる", isEnabled: false)
+        ServerPlugin(id: "zip", name: "ZIP操作", summary: "共有ファイルをZIPでまとめる", isEnabled: false),
+        ServerPlugin(id: "ssh", name: "SSH管理コンソール", summary: "LAN内SSHからServerPad管理コマンドを実行する", isEnabled: false)
     ]
 
     private static let commandHelp = """
@@ -334,7 +365,32 @@ public final class ServerPlatform: ObservableObject {
     plugin ID on|off     プラグイン切替
     config               現在の構成JSON
     curl                 アップロード用curl例
+    ssh                  SSH状態・接続情報
+    ssh start|stop       SSH起動・停止
+    ssh password         SSH認証情報
     """
+
+    private func startSSH() async {
+        guard sshEnabled, sshServer?.isRunning != true else { return }
+        let service = SSHServer()
+        do {
+            try await service.start(port: sshPort, username: sshUsername, password: sshPassword) { [weak self] command in
+                guard let self else { return "ServerPad unavailable" }
+                return await self.executeCommand(command)
+            }
+            sshServer = service
+            record("SSH管理サーバーをポート \(sshPort) で開始")
+        } catch {
+            record("SSH起動失敗: \(error.localizedDescription)")
+        }
+    }
+
+    private func stopSSH() async {
+        guard let service = sshServer else { return }
+        await service.stop()
+        sshServer = nil
+        record("SSH管理サーバーを停止")
+    }
 
     private static func addresses() -> [String] {
         var result: [String] = []
