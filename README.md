@@ -104,3 +104,15 @@ git push origin v0.1.0
 `v*.*.*` のタグがpushされると、テスト成功後にソースZIP付きのGitHub Releaseを自動作成します。
 
 <!-- CI re-run after SSH integration fix -->
+
+## 静的Webサイト
+
+「Webサイト」領域へHTML・CSS・JavaScript・画像をアップロードできます。
+
+- 公開URL: `http://127.0.0.1:8080/site/` または表示されたLAN URL
+- `index.html` がサイトの入口
+- ブラウザから `/site/` を開いてアップロード
+- API: `GET /api/site/files`
+- アップロード: `POST /site/upload?name=index.html`
+
+静的ファイル配信のみで、Swift・PHP・Pythonなどのサーバー側コードは実行しません。外部インターネット公開には対応していません。
