@@ -70,6 +70,7 @@ public final class ServerPlatform: ObservableObject {
     }
 
     public var accessURLs: [String] { localAddresses.map { "http://\($0):\(port)" } }
+    public var bonjourEnabled: Bool { plugins.first(where: { $0.id == "bonjour" })?.isEnabled == true }
 
     public var configurationJSON: String {
         let snapshot = SettingsSnapshot(port: port, serverName: serverName, maxRequestMiB: maxRequestMiB, autoStart: autoStart, enabledPluginIDs: plugins.filter(\.isEnabled).map(\.id))
@@ -106,7 +107,7 @@ public final class ServerPlatform: ObservableObject {
     public func start() async {
         guard !isRunning else { return }
         status = "起動中…"
-        let runtime = HTTPServer(maximumRequestBytes: maxRequestMiB * 1024 * 1024) { [weak self] request in
+        let runtime = HTTPServer(maximumRequestBytes: maxRequestMiB * 1024 * 1024, serviceName: bonjourEnabled ? serverName : nil) { [weak self] request in
             guard let self else { return .text("Unavailable", status: 503) }
             return await self.route(request)
         }
