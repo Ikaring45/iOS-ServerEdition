@@ -107,9 +107,23 @@ struct BuildCodeView: View {
 @MainActor
 struct ConfigCodeView: View {
     @ObservedObject var platform: ServerPlatform
+    @State private var code = ""
+    @State private var message = ""
+
     var body: some View {
-        let code = platform.configurationJSON
-        return CodeTextView(title: "構成コード", code: code)
+        VStack(spacing: 0) {
+            TextEditor(text: $code)
+                .font(.system(.body, design: .monospaced))
+                .padding(8)
+            HStack {
+                Button("現在の設定を読み込む") { code = platform.configurationJSON; message = "読み込みました" }
+                Button("構成を適用") { message = platform.applyConfigurationJSON(code) ? "適用しました" : "JSONまたは値が不正です" }
+                    .buttonStyle(.borderedProminent)
+                if !message.isEmpty { Text(message).font(.caption).foregroundStyle(.secondary) }
+            }.padding()
+        }
+        .navigationTitle("構成コード")
+        .onAppear { if code.isEmpty { code = platform.configurationJSON } }
     }
 }
 
