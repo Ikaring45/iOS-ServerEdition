@@ -1,4 +1,5 @@
 name: ServerPad CI
+# SSH integration validation
 
 on:
   push:
