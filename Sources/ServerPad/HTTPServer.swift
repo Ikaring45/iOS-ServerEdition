@@ -7,9 +7,11 @@ public actor HTTPServer {
     private let queue = DispatchQueue(label: "ServerPad.HTTP")
     private let handler: Handler
     private let maximumRequestBytes: Int
+    private let serviceName: String?
 
-    public init(maximumRequestBytes: Int = 25 * 1024 * 1024, handler: @escaping Handler) {
+    public init(maximumRequestBytes: Int = 25 * 1024 * 1024, serviceName: String? = nil, handler: @escaping Handler) {
         self.maximumRequestBytes = max(1, maximumRequestBytes)
+        self.serviceName = serviceName
         self.handler = handler
     }
 
@@ -18,6 +20,9 @@ public actor HTTPServer {
         let parameters = NWParameters.tcp
         parameters.allowLocalEndpointReuse = true
         let newListener = try NWListener(using: parameters, on: NWEndpoint.Port(rawValue: port)!)
+        if let serviceName, !serviceName.isEmpty {
+            newListener.service = NWListener.Service(name: serviceName, type: "_http._tcp")
+        }
         newListener.newConnectionHandler = { [weak self] connection in
             guard let self else { return }
             Task { await self.accept(connection) }
