@@ -195,7 +195,23 @@ public final class ServerPlatform: ObservableObject {
             let encoded = file.name.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? file.name
             return "<li><a href=\"/files/\(encoded)\">\(Self.escape(file.name))</a> <small>\(file.bytes) bytes</small></li>"
         }.joined()
-        return "<!doctype html><meta name=viewport content='width=device-width'><title>Files</title><style>body{font:16px system-ui;max-width:720px;margin:3rem auto;padding:1rem;background:#0b1220;color:#e8eef8}a{color:#68b5ff}li{padding:.6rem}</style><h1>共有ファイル</h1><ul>\(rows)</ul><p><a href='/'>戻る</a></p>"
+        return """
+        <!doctype html><meta name="viewport" content="width=device-width"><title>ServerPad Files</title>
+        <style>body{font:16px system-ui;max-width:720px;margin:3rem auto;padding:1rem;background:#0b1220;color:#e8eef8}a{color:#68b5ff}li{padding:.6rem}button{padding:.55rem .8rem}</style>
+        <h1>共有ファイル</h1>
+        <p><input id="file" type="file"> <button onclick="upload()">アップロード</button></p>
+        <p id="message"></p><ul>\(rows)</ul><p><a href="/">戻る</a></p>
+        <script>
+        async function upload(){
+          const input=document.getElementById('file'), message=document.getElementById('message');
+          if(!input.files.length){message.textContent='ファイルを選択してください';return;}
+          const file=input.files[0]; message.textContent='アップロード中…';
+          const response=await fetch('/files/upload?name='+encodeURIComponent(file.name),{method:'POST',body:file});
+          message.textContent=response.ok?'完了しました':'失敗しました';
+          if(response.ok) location.reload();
+        }
+        </script>
+        """
     }
 
     private func record(_ message: String) {
