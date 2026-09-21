@@ -30,6 +30,13 @@ struct WebServerView: View {
                 WebEndpointRow(title: "ファイル一覧", path: "/files", platform: platform)
                 WebEndpointRow(title: "ファイル一覧JSON", path: "/api/files", platform: platform)
             }
+            Section("JMA互換API") {
+                Text(platform.selfAccessURL + "/api/jma/jma_eew.json")
+                    .font(.system(.caption, design: .monospaced))
+                    .textSelection(.enabled)
+                Text("地震・津波・警報・予報などのJSONをLAN内へ提供します。取得元は現在Wolfxアダプターです。")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             Section("管理API") {
                 Text("POST /api/server/start")
                 Text("POST /api/server/stop")
