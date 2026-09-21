@@ -49,6 +49,7 @@ public final class ServerPlatform: ObservableObject {
     @Published public private(set) var sshPassword = ""
 
     private let jmaAPI = JMAAPIService()
+    private let testReplay = JMATestReplayService()
     private var server: HTTPServer?
     private var sshServer: SSHServer?
     private let filesURL: URL
@@ -189,6 +190,8 @@ public final class ServerPlatform: ObservableObject {
             case "password": return "ssh-user=\(sshUsername) password=\(sshPassword)"
             default: return "使い方: ssh [status|start|stop|port 2222|password]"
             }
+        case "test":
+            return await testReplay.command(Array(parts.dropFirst()))
         case "jma":
             if parts.count == 1 { return "JMA API: \(selfAccessURL)/api/jma/jma_eew.json" }
             if parts[1].lowercased() == "endpoints" {
@@ -282,7 +285,19 @@ public final class ServerPlatform: ObservableObject {
             return serveSiteFile(path: rawPath, headOnly: request.method == "HEAD")
         }
 
+        if request.path == "/api/test/status" && request.method == "GET" {
+            return .json(await testReplay.status())
+        }
+        if request.path == "/api/test/scenarios" && request.method == "GET" {
+            return await testReplay.scenariosJSON()
+        }
+        if request.path == "/api/test/control" && request.method == "POST" {
+            return await testReplay.control(request.body)
+        }
         if request.path.hasPrefix("/api/jma/") && request.method == "GET" {
+            if await testReplay.status().enabled {
+                return await testReplay.response(for: request.path)
+            }
             return await jmaAPI.response(for: request.path)
         }
         if request.path == "/api/status" && request.method == "GET" {
