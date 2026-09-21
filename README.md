@@ -55,6 +55,10 @@ struct ServerPadApp: App {
 | GET | `/files/{name}` | ファイル取得 |
 | POST | `/files/upload?name={name}` | リクエスト本文をファイルとして保存 |
 
+## Webサーバーとしての利用
+
+アプリの「Webサーバー公開」画面から、同じiPadでは `http://127.0.0.1:ポート`、同じWi‑Fi上の別端末では表示されたLANアドレスを開けます。Bonjour公開プラグインを有効にすると `_http._tcp` として発見できます。インターネット全体への公開には、HTTPS対応の中継・トンネルまたはルーター設定が別途必要です。
+
 アップロード例：
 
 ```bash
