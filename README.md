@@ -134,3 +134,41 @@ GET /api/jma/jma_amedas.json
 ```
 
 現在の第1段階はWolfx JMA APIを取得してLAN内へキャッシュ配信するアダプターです。1秒キャッシュを使用し、外部公開は行いません。将来的に気象庁XMLを直接取得・解析するバックエンドへ差し替えられる構造にしています。
+
+
+## テスト再生サーバー
+
+通常の `/api/jma/*.json` はWolfxアダプターを使用します。テスト再生を有効にすると、内蔵シナリオまたは手動投入したJSONを返します。テスト中のJMAレスポンスには `X-ServerPad-Test-Mode: true` ヘッダーが付きます。
+
+```text
+test on
+test load demo-eew
+test speed 10
+test start
+test seek 8
+test pause
+test stop
+test off
+```
+
+HTTPからは以下を使います。
+
+```text
+GET  /api/test/status
+GET  /api/test/scenarios
+POST /api/test/control
+```
+
+例:
+
+```json
+{"action":"start"}
+```
+
+過去のJSONを手動で返す場合:
+
+```json
+{"action":"emit","endpoint":"jma_eew.json","payload":{"EventID":"20260730005001","Serial":1,"Hypocenter":"テスト震源","Magnitude":5.4,"Depth":10,"MaxIntensity":"4"}}
+```
+
+テスト機能は同じWi‑Fi内での開発・検証用です。実際の防災通知や公式情報の代わりにはしないでください。
