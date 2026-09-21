@@ -1,6 +1,58 @@
 import SwiftUI
 
 @MainActor
+struct WebServerView: View {
+    @ObservedObject var platform: ServerPlatform
+    @Environment(\.openURL) private var openURL
+
+    private var selfURL: URL { URL(string: platform.selfAccessURL)! }
+
+    var body: some View {
+        List {
+            Section("Webサーバー") {
+                LabeledContent("状態", value: platform.status)
+                LabeledContent("自己アクセス", value: platform.selfAccessURL)
+                Button("このiPadでWebページを開く") { openURL(selfURL) }
+                    .disabled(!platform.isRunning)
+            }
+            Section("同じWi‑Fiからのアクセス") {
+                if platform.accessURLs.isEmpty {
+                    Text("サーバー起動後にアドレスを表示します").foregroundStyle(.secondary)
+                }
+                ForEach(platform.accessURLs, id: \.self) { address in
+                    Link(address, destination: URL(string: address)!)
+                        .font(.system(.body, design: .monospaced))
+                }
+            }
+            Section("公開エンドポイント") {
+                WebEndpointRow(title: "トップページ", path: "/", platform: platform)
+                WebEndpointRow(title: "状態JSON", path: "/api/status", platform: platform)
+                WebEndpointRow(title: "ファイル一覧", path: "/files", platform: platform)
+                WebEndpointRow(title: "ファイル一覧JSON", path: "/api/files", platform: platform)
+            }
+            Section("インターネット公開") {
+                Text("現在は同じWi‑Fi内への公開です。インターネット全体へ公開するには、別途HTTPS対応の中継・トンネルまたはルーター設定が必要です。")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .navigationTitle("Webサーバー公開")
+    }
+}
+
+private struct WebEndpointRow: View {
+    let title: String
+    let path: String
+    @ObservedObject var platform: ServerPlatform
+
+    var body: some View {
+        let address = platform.selfAccessURL + path
+        return Link(destination: URL(string: address)!) {
+            HStack { Text(title); Spacer(); Text(path).font(.system(.caption, design: .monospaced)).foregroundStyle(.secondary) }
+        }.disabled(!platform.isRunning)
+    }
+}
+
+@MainActor
 struct ServerSettingsView: View {
     @ObservedObject var platform: ServerPlatform
     var body: some View {
