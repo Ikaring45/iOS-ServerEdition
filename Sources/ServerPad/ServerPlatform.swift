@@ -209,11 +209,21 @@ public final class ServerPlatform: ObservableObject {
         }
     }
 
-    private func route(_ request: HTTPRequest) -> HTTPResponse {
+    private func route(_ request: HTTPRequest) async -> HTTPResponse {
         record("\(request.method) \(request.target)")
         if request.path == "/" && ["GET", "HEAD"].contains(request.method) { return .text(Self.homeHTML, contentType: "text/html; charset=utf-8") }
         if request.path == "/api/status" && request.method == "GET" {
-            return .json(["name": "ServerPad", "status": "running", "port": String(port), "files": String(files.count)])
+            return .json(APIStatus(name: serverName, status: status, running: isRunning, port: port, files: files.count, bonjour: bonjourEnabled, urls: [selfAccessURL] + accessURLs))
+        }
+        if request.path == "/api/config" && request.method == "GET" { return .text(configurationJSON, contentType: "application/json; charset=utf-8") }
+        if request.path == "/api/plugins" && request.method == "GET" { return .json(plugins) }
+        if request.path == "/api/server/start" && request.method == "POST" { await start(); return .json(APIStatus(name: serverName, status: status, running: isRunning, port: port, files: files.count, bonjour: bonjourEnabled, urls: [selfAccessURL] + accessURLs)) }
+        if request.path == "/api/server/stop" && request.method == "POST" { await stop(); return .json(APIStatus(name: serverName, status: status, running: isRunning, port: port, files: files.count, bonjour: bonjourEnabled, urls: [selfAccessURL] + accessURLs)) }
+        if request.path == "/api/server/restart" && request.method == "POST" { await stop(); await start(); return .json(APIStatus(name: serverName, status: status, running: isRunning, port: port, files: files.count, bonjour: bonjourEnabled, urls: [selfAccessURL] + accessURLs)) }
+        if request.path == "/api/command" && request.method == "POST" {
+            let command = request.query["command"] ?? ((try? JSONDecoder().decode(APICommand.self, from: request.body))?.command ?? "")
+            guard !command.isEmpty else { return .json(APICommandResult(output: "commandが必要です"), status: 400) }
+            return .json(APICommandResult(output: await executeCommand(command)))
         }
         if request.path == "/api/files" && request.method == "GET" { refreshFiles(); return .json(files) }
         if request.path == "/files" && request.method == "GET" { refreshFiles(); return .text(fileIndexHTML(), contentType: "text/html; charset=utf-8") }
@@ -221,6 +231,19 @@ public final class ServerPlatform: ObservableObject {
         if request.path.hasPrefix("/files/") && ["GET", "HEAD"].contains(request.method) { return download(request) }
         return .text("Not found", status: 404)
     }
+
+    private struct APIStatus: Codable {
+        let name: String
+        let status: String
+        let running: Bool
+        let port: UInt16
+        let files: Int
+        let bonjour: Bool
+        let urls: [String]
+    }
+
+    private struct APICommand: Codable { let command: String }
+    private struct APICommandResult: Codable { let output: String }
 
     private func upload(_ request: HTTPRequest) -> HTTPResponse {
         guard let rawName = request.query["name"], let name = safeName(rawName), !request.body.isEmpty else { return .text("Use POST /files/upload?name=filename", status: 400) }
