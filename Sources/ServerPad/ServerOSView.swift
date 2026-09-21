@@ -22,6 +22,7 @@ public struct ServerOSView: View {
                 Section("開発") {
                     NavigationLink { PluginsView(platform: platform) } label: { Label("プラグイン", systemImage: "puzzlepiece.extension") }
                     NavigationLink { SSHView(platform: platform) } label: { Label("SSH", systemImage: "lock.shield") }
+                    NavigationLink { TestReplayView(platform: platform) } label: { Label("テスト再生", systemImage: "play.rectangle") }
                     NavigationLink { BuildCodeView() } label: { Label("システム構築コード", systemImage: "hammer") }
                     NavigationLink { ConfigCodeView(platform: platform) } label: { Label("構成コード", systemImage: "curlybraces.square") }
                     NavigationLink { CommandLineView(platform: platform) } label: { Label("コマンドライン", systemImage: "terminal") }
