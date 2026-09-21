@@ -351,3 +351,67 @@ private struct CodeTextView: View {
         }.navigationTitle(title)
     }
 }
+
+
+@MainActor
+struct TestReplayView: View {
+    @ObservedObject var platform: ServerPlatform
+    @State private var output = "test status"
+    @State private var seekText = "0"
+    @State private var speedText = "1"
+
+    var body: some View {
+        Form {
+            Section("テスト再生") {
+                Text("過去のJMA互換JSONを、指定した時刻・速度で返します。テスト中は通常のWolfx取得を停止します。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(output)
+                    .font(.system(.caption, design: .monospaced))
+                    .textSelection(.enabled)
+                HStack {
+                    Button("有効化") { run("test on") }
+                    Button("開始") { run("test start") }
+                    Button("一時停止") { run("test pause") }
+                    Button("停止") { run("test stop") }
+                }
+                HStack {
+                    TextField("秒", text: $seekText)
+                        .keyboardType(.decimalPad)
+                    Button("指定秒へ移動") { run("test seek \(seekText)") }
+                }
+                HStack {
+                    Text("速度")
+                    TextField("1", text: $speedText)
+                        .keyboardType(.decimalPad)
+                    Text("倍")
+                    Button("適用") { run("test speed \(speedText)") }
+                }
+                Button("無効化（通常APIへ戻す）") { run("test off") }
+            }
+            Section("利用URL") {
+                Text(platform.selfAccessURL + "/api/jma/jma_eew.json")
+                    .font(.system(.caption, design: .monospaced))
+                    .textSelection(.enabled)
+                Text("状態: GET /api/test/status  シナリオ: GET /api/test/scenarios")
+                    .font(.caption)
+                Text("操作: POST /api/test/control  {\"action\":\"start\"}")
+                    .font(.system(.caption, design: .monospaced))
+                    .textSelection(.enabled)
+            }
+        }
+        .navigationTitle("テスト再生")
+        .task { await refresh() }
+    }
+
+    private func run(_ command: String) {
+        Task {
+            output = await platform.executeCommand(command)
+            await refresh()
+        }
+    }
+
+    private func refresh() async {
+        output = await platform.executeCommand("test status")
+    }
+}
