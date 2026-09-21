@@ -105,6 +105,64 @@ public final class ServerPlatform: ObservableObject {
         record("プラグイン\(enabled ? "有効化" : "無効化"): \(plugins[index].name)")
     }
 
+    public func executeCommand(_ input: String) async -> String {
+        let line = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !line.isEmpty else { return "" }
+        let parts = line.split(whereSeparator: { $0 == " " || $0 == "\t" }).map(String.init)
+        guard let command = parts.first?.lowercased() else { return "" }
+
+        switch command {
+        case "help", "?":
+            return Self.commandHelp
+        case "status":
+            return "name=\(serverName) status=\(status) running=\(isRunning) port=\(port) files=\(files.count) bonjour=\(bonjourEnabled)"
+        case "start":
+            await start()
+            return status
+        case "stop":
+            await stop()
+            return status
+        case "restart":
+            await stop()
+            await start()
+            return status
+        case "port":
+            guard parts.count > 1, let value = UInt16(parts[1]), value > 0 else { return "使い方: port 8080" }
+            guard !isRunning else { return "停止中に変更してください" }
+            port = value
+            return "port=\(port)"
+        case "name":
+            guard parts.count > 1 else { return "name=\(serverName)" }
+            let value = parts.dropFirst().joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !value.isEmpty else { return "使い方: name ServerPad" }
+            serverName = String(value.prefix(64))
+            return "name=\(serverName)"
+        case "url", "urls":
+            let urls = [selfAccessURL] + accessURLs
+            return urls.joined(separator: "\n")
+        case "files", "ls":
+            refreshFiles()
+            return files.isEmpty ? "共有ファイルはありません" : files.map { "\($0.name)\t\($0.bytes) bytes" }.joined(separator: "\n")
+        case "delete", "rm":
+            guard parts.count > 1 else { return "使い方: delete filename" }
+            return deleteFile(named: parts[1]) ? "削除しました: \(parts[1])" : "削除できません: \(parts[1])"
+        case "plugins":
+            return plugins.map { "\($0.id)\t\($0.isEnabled ? "on" : "off")\t\($0.name)" }.joined(separator: "\n")
+        case "plugin":
+            guard parts.count > 2, ["on", "off"].contains(parts[2].lowercased()) else { return "使い方: plugin bonjour on|off" }
+            let id = parts[1]
+            guard plugins.contains(where: { $0.id == id }) else { return "不明なプラグイン: \(id)" }
+            setPluginEnabled(id, enabled: parts[2].lowercased() == "on")
+            return "plugin \(id)=\(parts[2].lowercased())（反映には再起動が必要）"
+        case "config":
+            return configurationJSON
+        case "curl":
+            return "curl --data-binary @FILE \"\(selfAccessURL)/files/upload?name=FILE\""
+        default:
+            return "不明なコマンド: \(command)（helpで一覧）"
+        }
+    }
+
     public func start() async {
         guard !isRunning else { return }
         status = "起動中…"
@@ -238,6 +296,22 @@ public final class ServerPlatform: ObservableObject {
         ServerPlugin(id: "pin-auth", name: "PIN認証", summary: "管理画面への簡易認証を追加する", isEnabled: false),
         ServerPlugin(id: "zip", name: "ZIP操作", summary: "共有ファイルをZIPでまとめる", isEnabled: false)
     ]
+
+    private static let commandHelp = """
+    help                 コマンド一覧
+    status               サーバー状態
+    start / stop         起動・停止
+    restart              再起動
+    port 8080            ポート変更（停止中のみ）
+    name ServerPad       サーバー名変更
+    url                  自己アクセス・LAN URL
+    files                共有ファイル一覧
+    delete FILE          共有ファイル削除
+    plugins              プラグイン一覧
+    plugin ID on|off     プラグイン切替
+    config               現在の構成JSON
+    curl                 アップロード用curl例
+    """
 
     private static func addresses() -> [String] {
         var result: [String] = []
