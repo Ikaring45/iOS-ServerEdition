@@ -6,7 +6,8 @@ let package = Package(
     platforms: [.iOS(.v17), .macOS(.v14)],
     products: [.library(name: "ServerPad", targets: ["ServerPad"])],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-nio-ssh.git", from: "0.9.2")
+        .package(url: "https://github.com/apple/swift-nio-ssh.git", from: "0.9.2"),
+        .package(url: "https://github.com/apple/swift-nio.git", from: "2.81.0")
     ],
     targets: [
         .target(
