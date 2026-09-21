@@ -56,8 +56,13 @@ public struct ServerOSView: View {
 private struct FilesView: View {
     @ObservedObject var platform: ServerPlatform
     var body: some View {
-        List(platform.files) { file in
+        List {
+            ForEach(platform.files) { file in
             VStack(alignment: .leading) { Text(file.name); Text(ByteCountFormatter.string(fromByteCount: Int64(file.bytes), countStyle: .file)).font(.caption).foregroundStyle(.secondary) }
+            }
+            .onDelete { offsets in
+                for index in offsets { _ = platform.deleteFile(named: platform.files[index].name) }
+            }
         }.navigationTitle("共有ファイル").toolbar { Button { platform.refreshFiles() } label: { Image(systemName: "arrow.clockwise") } }
     }
 }
