@@ -50,6 +50,12 @@ struct ServerPadApp: App {
 |---|---|---|
 | GET | `/` | Webトップ |
 | GET | `/api/status` | 稼働状態JSON |
+| GET | `/api/config` | 現在の構成JSON |
+| GET | `/api/plugins` | プラグイン一覧JSON |
+| POST | `/api/server/start` | サーバー起動 |
+| POST | `/api/server/stop` | サーバー停止 |
+| POST | `/api/server/restart` | サーバー再起動 |
+| POST | `/api/command` | 管理コマンド実行 |
 | GET | `/api/files` | ファイル一覧JSON |
 | GET | `/files` | ファイル一覧ページ |
 | GET | `/files/{name}` | ファイル取得 |
@@ -63,6 +69,16 @@ struct ServerPadApp: App {
 
 ```bash
 curl --data-binary @photo.jpg "http://IPAD-IP:8080/files/upload?name=photo.jpg"
+
+# APIからサーバー状態を確認
+curl "http://IPAD-IP:8080/api/status"
+
+# APIからサーバーを再起動
+curl -X POST "http://IPAD-IP:8080/api/server/restart"
+
+# APIから管理コマンドを実行
+curl -X POST -H 'Content-Type: application/json' \\
+  -d '{"command":"files"}' "http://IPAD-IP:8080/api/command"
 ```
 
 ## 重要な制約
