@@ -116,3 +116,21 @@ git push origin v0.1.0
 - アップロード: `POST /site/upload?name=index.html`
 
 静的ファイル配信のみで、Swift・PHP・Pythonなどのサーバー側コードは実行しません。外部インターネット公開には対応していません。
+
+## LAN内JMA互換API
+
+ServerPad起動中は、JMA防災情報に近いJSON APIをLAN内へ提供できます。
+
+例:
+
+```text
+GET /api/jma/jma_eew.json
+GET /api/jma/jma_earthquake.json
+GET /api/jma/jma_tsunami.json
+GET /api/jma/jma_warning.json
+GET /api/jma/jma_forecast.json
+GET /api/jma/jma_volcano.json
+GET /api/jma/jma_amedas.json
+```
+
+現在の第1段階はWolfx JMA APIを取得してLAN内へキャッシュ配信するアダプターです。1秒キャッシュを使用し、外部公開は行いません。将来的に気象庁XMLを直接取得・解析するバックエンドへ差し替えられる構造にしています。
