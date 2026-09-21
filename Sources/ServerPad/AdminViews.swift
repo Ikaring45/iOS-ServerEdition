@@ -183,20 +183,46 @@ struct ConfigCodeView: View {
 @MainActor
 struct CommandLineView: View {
     @ObservedObject var platform: ServerPlatform
+    @State private var command = ""
+    @State private var history = ["ServerPad command console", "helpでコマンド一覧を表示"]
+    @FocusState private var commandFocused: Bool
+
     var body: some View {
-        let host = platform.localAddresses.first ?? "IPAD-IP"
-        let commands = """
-        # 状態確認
-        curl http://\(host):\(platform.port)/api/status
+        VStack(spacing: 0) {
+            ScrollView {
+                Text(history.joined(separator: "\n"))
+                    .font(.system(.body, design: .monospaced))
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding()
+            }
+            Divider()
+            HStack {
+                Text("$").font(.system(.body, design: .monospaced)).foregroundStyle(.secondary)
+                TextField("help", text: $command)
+                    .font(.system(.body, design: .monospaced))
+                    .textFieldStyle(.plain)
+                    .focused($commandFocused)
+                    .onSubmit { runCommand() }
+                Button("実行") { runCommand() }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(command.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                Button("消去") { history = ["ServerPad command console"] }
+            }.padding()
+        }
+        .navigationTitle("コマンドライン")
+        .onAppear { commandFocused = true }
+    }
 
-        # ファイル一覧
-        curl http://\(host):\(platform.port)/api/files
-
-        # ファイル送信
-        curl --data-binary @photo.jpg \\
-          \"http://\(host):\(platform.port)/files/upload?name=photo.jpg\"
-        """
-        return CodeTextView(title: "コマンドライン", code: commands)
+    private func runCommand() {
+        let input = command.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !input.isEmpty else { return }
+        command = ""
+        history.append("$ \(input)")
+        Task {
+            let result = await platform.executeCommand(input)
+            if !result.isEmpty { history.append(result) }
+        }
     }
 }
 
