@@ -30,6 +30,7 @@ struct NetworkView: View {
             Section("待受") {
                 LabeledContent("ポート", value: String(platform.port))
                 LabeledContent("状態", value: platform.status)
+                LabeledContent("Bonjour", value: platform.bonjourEnabled ? "有効（再起動後に公開）" : "無効")
             }
             Section("接続アドレス") {
                 if platform.accessURLs.isEmpty { Text("サーバー起動後に表示されます").foregroundStyle(.secondary) }
@@ -83,7 +84,7 @@ struct PluginsView: View {
                     }
                 }
             }
-            Section { Text("プラグインは現在、設定状態の保存まで対応しています。実際の機能を有効化する段階で、各プラグインの権限とAPIを追加します。").font(.caption).foregroundStyle(.secondary) }
+            Section { Text("Bonjour公開は、プラグインを有効化してサーバーを再起動すると同一Wi‑Fi上へ公開されます。その他のプラグインは順次実装します。").font(.caption).foregroundStyle(.secondary) }
         }.navigationTitle("プラグイン")
     }
 }
