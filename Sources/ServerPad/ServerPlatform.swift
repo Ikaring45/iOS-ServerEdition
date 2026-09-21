@@ -77,6 +77,25 @@ public final class ServerPlatform: ObservableObject {
         return text
     }
 
+    @discardableResult
+    public func applyConfigurationJSON(_ text: String) -> Bool {
+        guard let data = text.data(using: .utf8),
+              let saved = try? JSONDecoder().decode(SettingsSnapshot.self, from: data),
+              saved.port > 0,
+              saved.maxRequestMiB > 0,
+              saved.maxRequestMiB <= 512 else { return false }
+        port = saved.port
+        serverName = saved.serverName.isEmpty ? "ServerPad" : saved.serverName
+        maxRequestMiB = saved.maxRequestMiB
+        autoStart = saved.autoStart
+        for index in plugins.indices {
+            plugins[index].isEnabled = saved.enabledPluginIDs.contains(plugins[index].id)
+        }
+        saveSettings()
+        record("構成コードを適用")
+        return true
+    }
+
     public func setPluginEnabled(_ id: String, enabled: Bool) {
         guard let index = plugins.firstIndex(where: { $0.id == id }) else { return }
         plugins[index].isEnabled = enabled
@@ -114,6 +133,20 @@ public final class ServerPlatform: ObservableObject {
             guard let values = try? url.resourceValues(forKeys: keys), values.isRegularFile == true else { return nil }
             return SharedFile(name: url.lastPathComponent, bytes: values.fileSize ?? 0, modified: values.contentModificationDate ?? .distantPast)
         }.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
+
+    @discardableResult
+    public func deleteFile(named name: String) -> Bool {
+        guard let safe = safeName(name) else { return false }
+        do {
+            try FileManager.default.removeItem(at: filesURL.appendingPathComponent(safe))
+            refreshFiles()
+            record("ファイルを削除: \(safe)")
+            return true
+        } catch {
+            record("ファイル削除失敗: \(safe)")
+            return false
+        }
     }
 
     private func route(_ request: HTTPRequest) -> HTTPResponse {
