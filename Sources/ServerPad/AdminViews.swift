@@ -173,7 +173,8 @@ struct SiteView: View {
             Section("公開URL") {
                 LabeledContent("サイト", value: platform.siteAccessURL)
                     .font(.system(.body, design: .monospaced))
-                Link("このiPadで開く", destination: URL(string: platform.siteAccessURL)!)
+                Link("このiPadでサイトを開く", destination: URL(string: platform.siteAccessURL)!)
+                Link("ファイル管理・アップロード", destination: URL(string: platform.siteManageURL)!)
                     .disabled(!platform.isRunning)
             }
             Section("ファイル") {
@@ -195,7 +196,7 @@ struct SiteView: View {
                 Button("一覧を更新") { platform.refreshSiteFiles() }
             }
             Section("アップロード") {
-                Text("ブラウザで \(platform.siteAccessURL) を開くと、サイト配信用ファイルをアップロードできます。")
+                Text("ブラウザで \(platform.siteManageURL) を開くと、サイト配信用ファイルをアップロードできます。")
                 Text("curl --data-binary @index.html "\(platform.selfAccessURL)/site/upload?name=index.html"")
                     .font(.system(.caption, design: .monospaced))
                     .textSelection(.enabled)
