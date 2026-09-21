@@ -5,8 +5,17 @@ let package = Package(
     name: "ServerPad",
     platforms: [.iOS(.v17), .macOS(.v14)],
     products: [.library(name: "ServerPad", targets: ["ServerPad"])],
+    dependencies: [
+        .package(url: "https://github.com/apple/swift-nio-ssh.git", from: "0.9.2")
+    ],
     targets: [
-        .target(name: "ServerPad"),
+        .target(
+            name: "ServerPad",
+            dependencies: [
+                .product(name: "NIOSSH", package: "swift-nio-ssh"),
+                .product(name: "NIOPosix", package: "swift-nio")
+            ]
+        ),
         .testTarget(name: "ServerPadTests", dependencies: ["ServerPad"])
     ]
 )
