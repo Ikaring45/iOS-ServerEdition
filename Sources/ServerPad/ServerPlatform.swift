@@ -70,6 +70,7 @@ public final class ServerPlatform: ObservableObject {
     }
 
     public var accessURLs: [String] { localAddresses.map { "http://\($0):\(port)" } }
+    public var selfAccessURL: String { "http://127.0.0.1:\(port)" }
     public var bonjourEnabled: Bool { plugins.first(where: { $0.id == "bonjour" })?.isEnabled == true }
 
     public var configurationJSON: String {
