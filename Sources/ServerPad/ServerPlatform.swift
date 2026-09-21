@@ -328,7 +328,7 @@ public final class ServerPlatform: ObservableObject {
     }
 
     private func saveSettings() {
-        let snapshot = SettingsSnapshot(port: port, serverName: serverName, maxRequestMiB: maxRequestMiB, autoStart: autoStart, enabledPluginIDs: plugins.filter(\.isEnabled).map(\.id))
+        let snapshot = SettingsSnapshot(port: port, serverName: serverName, maxRequestMiB: maxRequestMiB, autoStart: autoStart, sshPort: sshPort, sshUsername: sshUsername, sshPassword: sshPassword, enabledPluginIDs: plugins.filter(\.isEnabled).map(\.id))
         guard let data = try? JSONEncoder().encode(snapshot) else { return }
         settings.set(data, forKey: settingsKey)
     }
