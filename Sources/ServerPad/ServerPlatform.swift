@@ -85,6 +85,7 @@ public final class ServerPlatform: ObservableObject {
     public var accessURLs: [String] { localAddresses.map { "http://\($0):\(port)" } }
     public var selfAccessURL: String { "http://127.0.0.1:\(port)" }
     public var siteAccessURL: String { selfAccessURL + "/site/" }
+    public var siteManageURL: String { selfAccessURL + "/site/manage" }
     public var bonjourEnabled: Bool { plugins.first(where: { $0.id == "bonjour" })?.isEnabled == true }
     public var sshEnabled: Bool { plugins.first(where: { $0.id == "ssh" })?.isEnabled == true }
     public var sshStatus: String { sshServer?.status ?? "停止中" }
@@ -188,7 +189,7 @@ public final class ServerPlatform: ObservableObject {
             default: return "使い方: ssh [status|start|stop|port 2222|password]"
             }
         case "site":
-            if parts.count == 1 { refreshSiteFiles(); return "site-url=\(siteAccessURL) files=\(siteFiles.count)" }
+            if parts.count == 1 { refreshSiteFiles(); return "site-url=\(siteAccessURL) manage=\(siteManageURL) files=\(siteFiles.count)" }
             switch parts[1].lowercased() {
             case "url": return siteAccessURL
             case "files", "ls": refreshSiteFiles(); return siteFiles.isEmpty ? "Webサイトのファイルはありません" : siteFiles.map { "\($0.name)\\t\($0.bytes) bytes" }.joined(separator: "\\n")
@@ -255,6 +256,9 @@ public final class ServerPlatform: ObservableObject {
     private func route(_ request: HTTPRequest) async -> HTTPResponse {
         record("\(request.method) \(request.target)")
         if request.path == "/" && ["GET", "HEAD"].contains(request.method) { return .text(Self.homeHTML, contentType: "text/html; charset=utf-8") }
+        if request.path == "/site/manage" || request.path == "/site/manage/" {
+            return .text(Self.siteManagerHTML, contentType: "text/html; charset=utf-8")
+        }
         if request.path == "/site" || request.path == "/site/" {
             guard ["GET", "HEAD"].contains(request.method) else { return .text("Method not allowed", status: 405) }
             return serveSiteFile(path: "index.html", headOnly: request.method == "HEAD")
@@ -527,6 +531,24 @@ public final class ServerPlatform: ObservableObject {
     }
 
     private static func escape(_ value: String) -> String { value.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "<", with: "&lt;").replacingOccurrences(of: ">", with: "&gt;") }
+
+    private static let siteManagerHTML = """
+    <!doctype html><meta name="viewport" content="width=device-width"><title>ServerPad Webサイト管理</title>
+    <style>body{font:16px system-ui;max-width:720px;margin:3rem auto;padding:1rem;background:#0b1220;color:#e8eef8}a{color:#68b5ff}input,button{padding:.55rem}.card{padding:1rem;border:1px solid #29415f;border-radius:16px;margin:.8rem 0}code{color:#7ee7bd}</style>
+    <h1>Webサイト管理</h1>
+    <p><a href="/site/">サイトを開く</a></p>
+    <div class="card"><input id="file" type="file"> <button onclick="upload()">アップロード</button><p id="message"></p></div>
+    <p>アップロード先は <code>/site/</code> です。入口ファイル名は <code>index.html</code> にしてください。</p>
+    <script>
+    async function upload(){
+      const input=document.getElementById('file'), message=document.getElementById('message');
+      if(!input.files.length){message.textContent='ファイルを選択してください';return;}
+      const file=input.files[0]; message.textContent='アップロード中…';
+      const response=await fetch('/site/upload?name='+encodeURIComponent(file.name),{method:'POST',body:file});
+      message.textContent=response.ok?'完了しました。サイトを開いて確認してください':'失敗しました';
+    }
+    </script>
+    """;
 
     private static let homeHTML = """
     <!doctype html><meta name="viewport" content="width=device-width"><title>ServerPad</title>
