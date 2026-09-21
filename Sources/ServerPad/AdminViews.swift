@@ -165,6 +165,54 @@ struct BuildCodeView: View {
 }
 
 @MainActor
+struct SiteView: View {
+    @ObservedObject var platform: ServerPlatform
+
+    var body: some View {
+        List {
+            Section("公開URL") {
+                LabeledContent("サイト", value: platform.siteAccessURL)
+                    .font(.system(.body, design: .monospaced))
+                Link("このiPadで開く", destination: URL(string: platform.siteAccessURL)!)
+                    .disabled(!platform.isRunning)
+            }
+            Section("ファイル") {
+                if platform.siteFiles.isEmpty {
+                    Text("まだファイルがありません。index.htmlをアップロードしてください.")
+                        .foregroundStyle(.secondary)
+                }
+                ForEach(platform.siteFiles) { file in
+                    HStack {
+                        Text(file.name).font(.system(.body, design: .monospaced))
+                        Spacer()
+                        Text(ByteCountFormatter.string(fromByteCount: Int64(file.bytes), countStyle: .file))
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                .onDelete { offsets in
+                    for index in offsets { _ = platform.deleteSiteFile(named: platform.siteFiles[index].name) }
+                }
+                Button("一覧を更新") { platform.refreshSiteFiles() }
+            }
+            Section("アップロード") {
+                Text("ブラウザで \(platform.siteAccessURL) を開くと、サイト配信用ファイルをアップロードできます。")
+                Text("curl --data-binary @index.html "\(platform.selfAccessURL)/site/upload?name=index.html"")
+                    .font(.system(.caption, design: .monospaced))
+                    .textSelection(.enabled)
+            }
+            Section("対応") {
+                Text("HTML / CSS / JavaScript / PNG / JPEG / GIF / WebP / SVG / JSON / PDF / TXT")
+                    .font(.caption)
+                Text("静的ファイル配信のみです。サーバー側でSwift、PHP、Pythonなどは実行しません。")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .navigationTitle("Webサイト")
+        .task { platform.refreshSiteFiles() }
+    }
+}
+
+@MainActor
 struct SSHView: View {
     @ObservedObject var platform: ServerPlatform
     @State private var showingPassword = false
