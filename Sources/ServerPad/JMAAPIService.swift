@@ -9,7 +9,7 @@ actor JMAAPIService {
 
     private var cache: [String: CachedResponse] = [:]
     private let baseURL = URL(string: "https://api.wolfx.jp")!
-    static let endpointNames = [
+    nonisolated static let endpointNames = [
         "jma_eew.json",
         "jma_earthquake.json",
         "jma_tsunami.json",
