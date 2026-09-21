@@ -295,7 +295,8 @@ public final class ServerPlatform: ObservableObject {
             return await testReplay.control(request.body)
         }
         if request.path.hasPrefix("/api/jma/") && request.method == "GET" {
-            if await testReplay.status().enabled {
+            let replayStatus = await testReplay.status()
+            if replayStatus.enabled {
                 return await testReplay.response(for: request.path)
             }
             return await jmaAPI.response(for: request.path)
