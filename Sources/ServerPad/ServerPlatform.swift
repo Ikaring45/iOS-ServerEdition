@@ -176,7 +176,7 @@ public final class ServerPlatform: ObservableObject {
             case "stop": await stopSSH(); return sshStatus
             case "port":
                 guard parts.count > 2, let value = UInt16(parts[2]), value > 0 else { return "使い方: ssh port 2222" }
-                guard !sshServer?.isRunning ?? true else { return "SSHを停止してから変更してください" }
+                guard (sshServer?.isRunning ?? false) == false else { return "SSHを停止してから変更してください" }
                 sshPort = value; return "ssh-port=\(sshPort)"
             case "password": return "ssh-user=\(sshUsername) password=\(sshPassword)"
             default: return "使い方: ssh [status|start|stop|port 2222|password]"
@@ -390,6 +390,11 @@ public final class ServerPlatform: ObservableObject {
         await service.stop()
         sshServer = nil
         record("SSH管理サーバーを停止")
+    }
+
+    private static func generatePassword() -> String {
+        let alphabet = Array("ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789")
+        return String((0..<16).compactMap { _ in alphabet.randomElement() })
     }
 
     private static func addresses() -> [String] {
